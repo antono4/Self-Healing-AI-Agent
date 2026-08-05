@@ -1,0 +1,159 @@
+name: Config Parser
+
+on:
+  # Run every 10 minutes
+  schedule:
+    - cron: '*/10 * * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+  # Run when c4.yml changes
+  push:
+    branches:
+      - master
+    paths:
+      - 'c4.yml'
+
+jobs:
+  parse-c4-config:
+    name: 📋 Parse c4.yml Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install pyyaml
+
+      - name: Parse c4.yml
+        id: config
+        run: |
+          python -c "
+          import yaml
+          import json
+          
+          with open('c4.yml', 'r') as f:
+              config = yaml.safe_load(f)
+          
+          # Extract key configurations
+          output = {}
+          
+          # Metadata
+          if 'metadata' in config:
+              output['metadata'] = config['metadata']
+          
+          # Self-healing config
+          if 'self_healing' in config:
+              sh = config['self_healing']
+              output['self_healing'] = {
+                  'enabled': sh.get('enabled', False),
+                  'auto_fix': sh.get('auto_fix', False),
+                  'max_retries': sh.get('max_retries', 3),
+                  'interval_minutes': sh.get('interval_minutes', 10)
+              }
+          
+          # Releases config
+          if 'releases' in config:
+              rel = config['releases']
+              output['releases'] = {
+                  'enabled': rel.get('enabled', False),
+                  'interval_minutes': rel.get('schedule', {}).get('interval_minutes', 10)
+              }
+          
+          # Monitoring config
+          if 'monitoring' in config:
+              mon = config['monitoring']
+              output['monitoring'] = {
+                  'enabled': mon.get('enabled', False),
+                  'metrics': mon.get('metrics', [])
+              }
+          
+          # Security config
+          if 'security' in config:
+              sec = config['security']
+              output['security'] = {
+                  'code_review_required': sec.get('code_review_required', False),
+                  'max_fix_size': sec.get('max_fix_size', 500)
+              }
+          
+          print(json.dumps(output, indent=2))
+          
+          # Save to GITHUB_OUTPUT
+          with open('.config_summary', 'w') as f:
+              f.write(json.dumps(output, indent=2))
+          "
+          cat .config_summary
+
+      - name: Display Configuration Summary
+        run: |
+          echo "## c4.yml Configuration Summary"
+          echo "```yaml"
+          cat .config_summary
+          echo "```"
+
+      - name: Validate c4.yml Schema
+        run: |
+          python -c "
+          import yaml
+          import sys
+          
+          with open('c4.yml', 'r') as f:
+              config = yaml.safe_load(f)
+          
+          errors = []
+          
+          # Check required sections
+          required_sections = ['metadata', 'self_healing']
+          for section in required_sections:
+              if section not in config:
+                  errors.append(f'Missing required section: {section}')
+          
+          # Validate self_healing config
+          if 'self_healing' in config:
+              sh = config['self_healing']
+              if 'enabled' not in sh:
+                  errors.append('self_healing.enabled is required')
+              if 'auto_fix' not in sh:
+                  errors.append('self_healing.auto_fix is required')
+          
+          if errors:
+              print('Validation errors:')
+              for error in errors:
+                  print(f'  - {error}')
+              sys.exit(1)
+          else:
+              print('✓ c4.yml validation passed')
+          "
+
+      - name: Check Configuration Changes
+        if: github.event_name == 'push'
+        run: |
+          echo "## Configuration Changes"
+          echo "```diff"
+          git diff HEAD~1 c4.yml || echo "No previous version to compare"
+          echo "```"
+
+      - name: Upload Config Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: config-summary
+          path: .config_summary
+          retention-days: 7
+
+      - name: Summary
+        run: |
+          echo "## Config Parser Summary" >> \$GITHUB_STEP_SUMMARY
+          echo "" >> \$GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> \$GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> \$GITHUB_STEP_SUMMARY
+          echo "| c4.yml Parsed | ✅ |" >> \$GITHUB_STEP_SUMMARY
+          echo "| Schema Valid | ✅ |" >> \$GITHUB_STEP_SUMMARY
+          echo "| Trigger | \${{ github.event_name }} |" >> \$GITHUB_STEP_SUMMARY
