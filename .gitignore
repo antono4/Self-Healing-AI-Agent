@@ -47,3 +47,11 @@ Thumbs.db
 .self_healing_agent/
 *.db
 *.db-journal
+
+# Workflow status (generated)
+workflow_status.json
+workflow_report_*.json
+
+# Releases (generated)
+releases/
+TEST_CHANGELOG.md

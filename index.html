@@ -419,6 +419,35 @@
                 </div>
             </div>
         </div>
+
+        <!-- Release Notes -->
+        <div class="card">
+            <h2>📝 Release Notes</h2>
+            <div id="releaseSection">
+                <div style="color: #666; text-align: center; padding: 20px;">
+                    No releases yet. Start the scheduler to generate release notes.
+                </div>
+            </div>
+            <div class="controls">
+                <button class="btn-primary" onclick="generateRelease()">
+                    📝 Generate Release Notes
+                </button>
+                <button class="btn-primary" onclick="viewChangelog()">
+                    📄 View Changelog
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Changelog Modal -->
+    <div id="changelogModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+        <div style="background: #1a1a2e; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto; border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="color: #00d9ff;">📄 Changelog</h2>
+                <button onclick="closeChangelog()" style="background: #ff6b6b; border: none; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer;">Close</button>
+            </div>
+            <pre id="changelogContent" style="color: #e4e4e4; white-space: pre-wrap; font-family: 'Consolas', monospace; font-size: 0.9rem;"></pre>
+        </div>
     </div>
 
     <script>
@@ -741,6 +770,102 @@ safety_checks:
                 addLog('info', 'Monitoring c4.yml for changes...');
             }
         }, 30000);
+
+        // Load releases on page load
+        loadReleases();
+
+        async function loadReleases() {
+            try {
+                const response = await fetch('/api/releases');
+                const data = await response.json();
+                updateReleaseSection(data);
+            } catch (error) {
+                console.log('Could not load releases');
+            }
+        }
+
+        function updateReleaseSection(data) {
+            const container = document.getElementById('releaseSection');
+            
+            if (data.releases.length === 0) {
+                container.innerHTML = `
+                    <div style="color: #666; text-align: center; padding: 20px;">
+                        No releases yet. Start the scheduler to generate release notes.
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div style="margin-bottom: 15px;">';
+            data.releases.slice(-3).forEach(release => {
+                html += `
+                    <div class="log-entry log-success" style="margin-bottom: 10px;">
+                        <strong>${release.name}</strong>
+                        <div style="color: #888; font-size: 0.85rem; margin-top: 5px;">
+                            ${release.modified} - ${formatFileSize(release.size)}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        async function generateRelease() {
+            try {
+                addLog('info', '📝 Generating release notes...');
+                
+                const response = await fetch('/api/release', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    addLog('success', '✅ Release notes generated successfully!');
+                    loadReleases();
+                } else {
+                    addLog('error', 'Failed to generate release notes');
+                }
+            } catch (error) {
+                addLog('error', 'Error generating release: ' + error.message);
+            }
+        }
+
+        async function viewChangelog() {
+            try {
+                const response = await fetch('/api/releases');
+                const data = await response.json();
+                
+                if (data.changelog_exists) {
+                    // Fetch changelog content
+                    const changelogResponse = await fetch('./CHANGELOG.md');
+                    const changelogContent = await changelogResponse.text();
+                    
+                    document.getElementById('changelogContent').textContent = changelogContent;
+                    document.getElementById('changelogModal').style.display = 'block';
+                } else {
+                    addLog('warning', 'No changelog found');
+                }
+            } catch (error) {
+                addLog('error', 'Could not load changelog');
+            }
+        }
+
+        function closeChangelog() {
+            document.getElementById('changelogModal').style.display = 'none';
+        }
+
+        // Close modal on outside click
+        document.getElementById('changelogModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeChangelog();
+            }
+        });
     </script>
 </body>
 </html>

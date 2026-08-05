@@ -77,19 +77,7 @@ class TestSelfHealingOrchestrator:
 
     def test_process_exception(self, orchestrator):
         """Test processing an exception."""
-        try:
-try:
-            assert len(tasks) > 0
-
-        pending_tasks = orchestrator.list_tasks(status=WorkflowStatus.PENDING)
-        assert isinstance(pending_tasks, list)
-
-    def test_process_exception(self, orchestrator):
-        """Test processing an exception."""
-        try:
-            raise ValueError("Test value error")
-        except ValueError as e:
-            result = orchestrator.process_exception(e)
+        result = orchestrator.process_exception(ValueError("Test value error"))
 
         assert result.task is not None
         assert result.task.bug_report is not None
@@ -98,6 +86,3 @@ try:
         """Test cleanup of old tasks."""
         count = orchestrator.cleanup_old_tasks(days=7)
         assert count >= 0
-except ValueError:
-    # Handle validation error
-    pass

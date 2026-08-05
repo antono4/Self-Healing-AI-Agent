@@ -41,7 +41,9 @@ class WorkflowScheduler:
             "total_runs": 0,
             "last_run": None,
             "next_run": None,
-            "status": "stopped"
+            "status": "stopped",
+            "success_rate": 0.0,
+            "avg_fix_time": 0.0
         }
         self.load_status()
     
@@ -65,8 +67,11 @@ class WorkflowScheduler:
     def run_workflow(self):
         """Execute the self-healing workflow."""
         from self_healing_agent import SelfHealingOrchestrator
+        from self_healing_agent.releases import ReleaseGenerator
         
         logger.info("🔄 Starting self-healing workflow...")
+        
+        start_time = time.time()
         
         try:
             orchestrator = SelfHealingOrchestrator()
@@ -100,27 +105,81 @@ class WorkflowScheduler:
             
             bugs_processed = 0
             bugs_fixed = 0
+            changes = []
             
             for bug in sample_bugs:
                 result = orchestrator.process_bug(bug)
                 bugs_processed += 1
                 if result.success:
                     bugs_fixed += 1
+                    changes.append(f"Fixed {bug.bug_type.value}: {bug.message[:50]}")
+            
+            # Calculate stats
+            fix_time = time.time() - start_time
+            total_runs = self.stats["total_runs"] + 1
+            total_fixed = self.stats["bugs_fixed"] + bugs_fixed
+            success_rate = (total_fixed / total_runs * 100) if total_runs > 0 else 0
+            avg_fix_time = (self.stats["avg_fix_time"] * self.stats["total_runs"] + fix_time) / total_runs if total_runs > 0 else fix_time
             
             # Update statistics
             self.stats["bugs_detected"] += bugs_processed
             self.stats["bugs_fixed"] += bugs_fixed
-            self.stats["total_runs"] += 1
+            self.stats["total_runs"] = total_runs
+            self.stats["success_rate"] = round(success_rate, 1)
+            self.stats["avg_fix_time"] = round(avg_fix_time, 1)
             self.stats["last_run"] = datetime.now().isoformat()
             self.stats["status"] = "completed"
             self.save_status()
             
             logger.info(f"✅ Workflow completed: {bugs_fixed}/{bugs_processed} bugs fixed")
             
+            # Generate release notes every 10 minutes
+            self._generate_release_notes()
+            
         except Exception as e:
             logger.error(f"❌ Workflow failed: {e}")
             self.stats["status"] = "failed"
             self.save_status()
+    
+    def _generate_release_notes(self):
+        """Generate release notes based on workflow stats."""
+        try:
+            import yaml
+            
+            # Load c4.yml config
+            config_path = Path(__file__).parent / 'c4.yml'
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+            else:
+                config = {}
+            
+            # Import release generator
+            from self_healing_agent.releases.generator import ReleaseGenerator, WorkflowStats
+            
+            # Create release generator
+            generator = ReleaseGenerator(config)
+            
+            # Create workflow stats
+            stats = WorkflowStats(
+                bugs_detected=self.stats["bugs_detected"],
+                bugs_fixed=self.stats["bugs_fixed"],
+                total_runs=self.stats["total_runs"],
+                success_rate=self.stats["success_rate"],
+                avg_fix_time=self.stats["avg_fix_time"],
+                last_run=datetime.now()
+            )
+            
+            # Generate and save release
+            result = generator.generate_and_save(stats)
+            
+            if result.get("status") == "success":
+                logger.info(f"📝 Release notes generated: {result.get('version')}")
+                if result.get("github_release"):
+                    logger.info(f"🌐 GitHub release created: {result['github_release']}")
+                    
+        except Exception as e:
+            logger.error(f"Failed to generate release notes: {e}")
     
     def scheduler_loop(self):
         """Main scheduler loop."""
@@ -189,6 +248,8 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.send_json_response(self.scheduler.get_status())
         elif self.path == '/api/config':
             self.send_json_response(self.load_c4_config())
+        elif self.path == '/api/releases':
+            self.send_json_response(self.get_releases())
         elif self.path == '/':
             self.path = '/index.html'
             super().do_GET()
@@ -206,6 +267,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         elif self.path == '/api/run':
             threading.Thread(target=self.scheduler.run_workflow, daemon=True).start()
             self.send_json_response({"success": True, "message": "Workflow triggered"})
+        elif self.path == '/api/release':
+            self.scheduler._generate_release_notes()
+            self.send_json_response({"success": True, "message": "Release notes generated"})
         else:
             self.send_error(404)
     
@@ -246,6 +310,28 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         
         return {"error": "c4.yml not found"}
     
+    def get_releases(self):
+        """Get list of release files."""
+        releases_dir = Path(__file__).parent / 'releases'
+        changelog_path = Path(__file__).parent / 'CHANGELOG.md'
+        
+        releases = []
+        
+        if releases_dir.exists():
+            for f in sorted(releases_dir.glob("*.md")):
+                releases.append({
+                    "name": f.name,
+                    "path": str(f),
+                    "size": f.stat().st_size,
+                    "modified": datetime.fromtimestamp(f.stat().st_mtime).isoformat()
+                })
+        
+        return {
+            "releases": releases,
+            "changelog_exists": changelog_path.exists(),
+            "changelog_path": str(changelog_path) if changelog_path.exists() else None
+        }
+    
     def log_message(self, format, *args):
         """Override to customize logging."""
         logger.info(f"{self.address_string()} - {format % args}")
@@ -278,13 +364,16 @@ def main():
 ║  🌐 Dashboard:  http://localhost:{PORT}                      ║
 ║  ⏰ Schedule:    Every {INTERVAL_MINUTES} minutes                                 ║
 ║  📁 Config:     c4.yml                                       ║
+║  📝 Releases:   releases/ CHANGELOG.md                      ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  API Endpoints:                                             ║
 ║    GET  /api/status     - Get scheduler status               ║
 ║    GET  /api/config     - Get c4.yml configuration           ║
-║    POST /api/start      - Start scheduler                   ║
-║    POST /api/stop       - Stop scheduler                    ║
-║    POST /api/run        - Run workflow immediately          ║
+║    GET  /api/releases    - List release notes                 ║
+║    POST /api/start       - Start scheduler                   ║
+║    POST /api/stop        - Stop scheduler                    ║
+║    POST /api/run         - Run workflow immediately          ║
+║    POST /api/release     - Generate release notes            ║
 ╚══════════════════════════════════════════════════════════════╝
     """)
     
