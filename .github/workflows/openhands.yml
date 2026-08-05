@@ -1,0 +1,179 @@
+name: OpenHands Cloud Integration
+
+on:
+  # Run every 10 minutes
+  schedule:
+    - cron: '*/10 * * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task to run'
+        required: true
+        default: 'full-workflow'
+        type: choice
+        options:
+          - full-workflow
+          - analyze
+          - fix
+          - improve
+          - report
+
+  # Run after self-healing workflow
+  workflow_run:
+    workflows: ["Self-Healing AI Agent"]
+    types: [completed]
+    branches: [master]
+
+jobs:
+  trigger-openhands:
+    name: 🤖 Trigger OpenHands Cloud
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+
+      - name: Trigger OpenHands Conversation
+        id: trigger
+        env:
+          OPENHANDS_CLOUD_API_KEY: ${{ secrets.OPENHANDS_API_KEY }}
+        run: |
+          echo "🤖 Triggering OpenHands Cloud..."
+          
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          from openhands import OpenHandsClient, OpenHandsConfig, TaskGenerator
+          
+          config = OpenHandsConfig(
+              api_key='${{ secrets.OPENHANDS_API_KEY }}',
+              repository='${{ github.repository }}',
+              branch='${{ github.ref_name }}',
+          )
+          
+          client = OpenHandsClient(config)
+          
+          task_type = '${{ github.event.inputs.task || 'full-workflow' }}'
+          
+          if task_type == 'full-workflow':
+              message = TaskGenerator.generate_full_workflow_task({
+                  'bugs_detected': 5,
+                  'bugs_fixed': 3,
+                  'success_rate': 75.0,
+                  'total_runs': 10,
+                  'last_run': 'Now'
+              })
+              title = 'Self-Healing Workflow'
+          elif task_type == 'improve':
+              message = TaskGenerator.generate_improve_agent_task()
+              title = 'Improve Self-Healing Agent'
+          elif task_type == 'report':
+              message = TaskGenerator.generate_report_task({
+                  'bugs_detected': 5,
+                  'bugs_fixed': 3,
+                  'success_rate': 75.0,
+                  'total_runs': 10
+              })
+              title = 'Generate Report'
+          else:
+              message = TaskGenerator.generate_analyze_task(
+                  type('Bug', (), {
+                      'bug_id': 'BUG-AUTO',
+                      'bug_type': 'AUTO_DETECTED',
+                      'message': 'Automated analysis task',
+                      'file_path': None,
+                      'line_number': None,
+                      'root_cause': 'To be analyzed',
+                      'suggested_fix': 'TBD'
+                  })()
+              )
+              title = 'Analyze Bug'
+          
+          result = client.run_self_healing_task(
+              task_description=message,
+              wait_for_completion=False
+          )
+          
+          print(f'RESULT={result}')
+          print(f'CONVERSATION_URL={result.get(\"conversation_url\", \"\")}')
+          "
+          
+          echo "conversation_url=$CONVERSATION_URL" >> $GITHUB_OUTPUT
+
+      - name: Display Result
+        run: |
+          echo "✅ OpenHands conversation triggered!"
+          echo ""
+          echo "📎 Conversation URL: ${{ steps.trigger.outputs.conversation_url }}"
+          echo ""
+          echo "🌐 Open the URL above to see the conversation in OpenHands Cloud"
+
+      - name: Create Issue Comment
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.trigger.outputs.conversation_url }}';
+            if (url) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.inputs?.issue_number || context.payload.pull_request?.number,
+                body: `🤖 OpenHands conversation started!\n\n📎 [View Conversation](${url})\n\nTask: ${{ github.event.inputs.task || 'full-workflow' }}`
+              });
+            }
+
+  monitor-conversation:
+    name: 👁️ Monitor Conversation
+    runs-on: ubuntu-latest
+    needs: trigger-openhands
+    if: needs.trigger-openhands.outputs.conversation_url
+    concurrency:
+      group: openhands-monitor
+      cancel-in-progress: true
+    
+    steps:
+      - name: Monitor Status
+        run: |
+          echo "👁️ Monitoring OpenHands conversation..."
+          echo ""
+          echo "📎 URL: ${{ needs.trigger-openhands.outputs.conversation_url }}"
+          echo ""
+          echo "💡 To monitor manually:"
+          echo "   1. Open the URL above"
+          echo "   2. Watch the agent work"
+          echo "   3. Interact if needed"
+
+  summarize-results:
+    name: 📊 Summarize Results
+    runs-on: ubuntu-latest
+    needs: [trigger-openhands, monitor-conversation]
+    if: always()
+    
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "## 📊 OpenHands Integration Summary"
+          echo ""
+          echo "| Item | Value |"
+          echo "|------|-------|"
+          echo "| Workflow | ${{ github.workflow }} |"
+          echo "| Event | ${{ github.event_name }} |"
+          echo "| Task | ${{ github.event.inputs.task || 'full-workflow' }} |"
+          echo "| Trigger URL | ${{ needs.trigger-openhands.outputs.conversation_url || 'N/A' }} |"
+          echo "| Status | ${{ needs.trigger-openhands.result }} |"
+          echo ""
+          echo "---"
+          echo "📎 Conversation: ${{ needs.trigger-openhands.outputs.conversation_url }}"

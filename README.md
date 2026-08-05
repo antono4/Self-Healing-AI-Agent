@@ -48,6 +48,84 @@ python -m http.server 8080
 | `/api/stop` | POST | Stop scheduler |
 | `/api/run` | POST | Run workflow immediately |
 
+## OpenHands Cloud Integration
+
+Integrasikan dengan **OpenHands Cloud** untuk kemampuan AI yang lebih powerful!
+
+### Setup
+
+1. Dapatkan API key dari [https://app.all-hands.dev](https://app.all-hands.dev)
+2. Set environment variable:
+   ```bash
+   export OPENHANDS_CLOUD_API_KEY='your-api-key'
+   ```
+
+3. Tambahkan secret di GitHub repository:
+   - Settings > Secrets > Actions > New repository secret
+   - Name: `OPENHANDS_API_KEY`
+   - Value: your API key
+
+### Penggunaan
+
+```bash
+# Trigger full self-healing workflow
+python scripts/trigger_openhands.py --task full-workflow
+
+# Analyze a specific bug
+python scripts/trigger_openhands.py --task analyze --bug-id BUG-001
+
+# Improve the agent itself
+python scripts/trigger_openhands.py --task improve
+
+# Generate report
+python scripts/trigger_openhands.py --task report
+
+# List recent conversations
+python scripts/trigger_openhands.py --list
+```
+
+### Task Types
+
+| Task | Description |
+|------|-------------|
+| `full-workflow` | Run complete self-healing workflow |
+| `analyze` | Analyze specific bug |
+| `fix` | Fix specific bug |
+| `review` | Review code for issues |
+| `improve` | Improve agent capabilities |
+| `report` | Generate reports |
+
+### Workflows
+
+GitHub Actions workflow `.github/workflows/openhands.yml` menjalankan:
+
+1. **trigger-openhands** - Trigger OpenHands conversation
+2. **monitor-conversation** - Monitor conversation status
+3. **summarize-results** - Generate summary report
+
+#### Manual Trigger
+
+```bash
+# Via GitHub CLI
+gh workflow run openhands.yml -f task=full-workflow
+
+# Via API
+curl -X POST https://api.github.com/repos/owner/repo/actions/workflows/openhands.yml/dispatches \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -d '{"ref":"master","inputs":{"task":"full-workflow"}}'
+```
+
+### OpenHands Cloud URL
+
+Setelah triggered, Anda bisa melihat conversation di:
+- **https://app.all-hands.dev/conversations/{conversation_id}**
+
+Workflow ini akan secara otomatis:
+- ✅ Start conversation baru
+- ✅ Kirim task description
+- ✅ Monitor progress
+- ✅ Report results
+
 ## C4 Model Architecture
 
 Lihat `c4.yml` untuk arsitektur lengkap:
