@@ -1,0 +1,333 @@
+# Self-Healing AI Agent Configuration
+# C4 Model: Context, Containers, Components, Code
+
+metadata:
+  name: "Self-Healing AI Agent"
+  version: "1.0.0"
+  description: "AI agent yang bisa mendeteksi dan memperbaiki bug secara otomatis"
+  author: "AI Development Team"
+
+# ============================================
+# C4 Level 1: Context Diagram
+# ============================================
+context:
+  system_name: "Self-Healing Agent System"
+  description: "Sistem agen AI yang mampu mendeteksi, menganalisis, dan memperbaiki bug secara otonom"
+  
+  external_entities:
+    - name: "User"
+      description: "Pengguna yang memberikan task ke agent"
+      boundaries: "external"
+    
+    - name: "External APIs"
+      description: "API eksternal untuk enrich context"
+      boundaries: "external"
+    
+    - name: "Version Control System"
+      description: "Git repository untuk tracking perubahan"
+      boundaries: "external"
+
+  relationships:
+    - from: "User"
+      to: "Self-Healing Agent"
+      description: "Memberikan task/d指令"
+    
+    - from: "Self-Healing Agent"
+      to: "Version Control System"
+      description: "Commit fixes dan create branches"
+
+# ============================================
+# C4 Level 2: Container Diagram
+# ============================================
+containers:
+  - name: "Orchestrator Agent"
+    type: "agent"
+    description: "Agent utama yang mengkoordinasikan workflow"
+    technology: "Python + OpenHands SDK"
+    responsibilities:
+      - "Task decomposition"
+      - "Agent coordination"
+      - "Result aggregation"
+    ports:
+      - name: "api"
+        port: 8000
+        protocol: "HTTP"
+
+  - name: "Bug Detector"
+    type: "service"
+    description: "Mendeteksi bug dari logs, errors, dan test failures"
+    technology: "Python + LLM"
+    responsibilities:
+      - "Log analysis"
+      - "Error pattern detection"
+      - "Test failure analysis"
+
+  - name: "Code Analyzer"
+    type: "service"
+    description: "Menganalisis kode sumber untuk root cause"
+    technology: "AST + LLM"
+    responsibilities:
+      - "Code parsing"
+      - "Dependency analysis"
+      - "Root cause identification"
+
+  - name: "Self-Repair Engine"
+    type: "service"
+    description: "Generate dan apply fixes"
+    technology: "Code Generation + LLM"
+    responsibilities:
+      - "Fix generation"
+      - "Code modification"
+      - "Safety validation"
+
+  - name: "Verification Suite"
+    type: "service"
+    description: "Verify fixes dengan running tests"
+    technology: "Pytest + Custom Test Framework"
+    responsibilities:
+      - "Test execution"
+      - "Regression testing"
+      - "Quality gates"
+
+  - name: "Memory Store"
+    type: "database"
+    description: "Persistent storage untuk knowledge dan context"
+    technology: "SQLite + Vector Store"
+    responsibilities:
+      - "Knowledge persistence"
+      - "Context storage"
+      - "Learning from past fixes"
+
+# ============================================
+# C4 Level 3: Component Diagram
+# ============================================
+components:
+  orchestrator:
+    modules:
+      - name: "TaskManager"
+        description: "Manage dan decompose tasks"
+      - name: "AgentCoordinator"
+        description: "Coordinate sub-agents"
+      - name: "ResultAggregator"
+        description: "Aggregate results dari sub-agents"
+
+  bug_detector:
+    modules:
+      - name: "LogParser"
+        description: "Parse dan analyze logs"
+      - name: "ErrorClassifier"
+        description: "Classify error types"
+      - name: "AnomalyDetector"
+        description: "Detect anomalous patterns"
+
+  code_analyzer:
+    modules:
+      - name: "ASTParser"
+        description: "Parse Python AST"
+      - name: "DependencyGraph"
+        description: "Build dependency graph"
+      - name: "RootCauseFinder"
+        description: "Find root cause using LLM"
+
+  self_repair:
+    modules:
+      - name: "FixGenerator"
+        description: "Generate code fixes"
+      - name: "CodeModifier"
+        description: "Apply modifications safely"
+      - name: "SafetyChecker"
+        description: "Validate fix safety"
+
+  verification:
+    modules:
+      - name: "TestRunner"
+        description: "Run test suites"
+      - name: "RegressionChecker"
+        description: "Check for regressions"
+      - name: "QualityGates"
+        description: "Enforce quality standards"
+
+  memory:
+    modules:
+      - name: "KnowledgeBase"
+        description: "Store fix patterns"
+      - name: "VectorStore"
+        description: "Semantic search"
+      - name: "Learner"
+        description: "Learn from successful fixes"
+
+# ============================================
+# C4 Level 4: Code - Self-Healing Workflow
+# ============================================
+workflow:
+  name: "Self-Healing Workflow"
+  description: "Workflow utama untuk self-healing process"
+  
+  steps:
+    1:
+      name: "bug_detection"
+      component: "BugDetector"
+      actions:
+        - "Monitor logs for errors"
+        - "Analyze test failures"
+        - "Detect error patterns"
+      output: "bug_report"
+      
+    2:
+      name: "root_cause_analysis"
+      component: "CodeAnalyzer"
+      actions:
+        - "Parse affected code"
+        - "Build call graph"
+        - "Identify root cause"
+      input: "bug_report"
+      output: "root_cause_analysis"
+      
+    3:
+      name: "fix_generation"
+      component: "SelfRepair"
+      actions:
+        - "Generate fix candidates"
+        - "Validate fix safety"
+        - "Select best fix"
+      input: "root_cause_analysis"
+      output: "verified_fix"
+      
+    4:
+      name: "verification"
+      component: "VerificationSuite"
+      actions:
+        - "Apply fix to codebase"
+        - "Run test suite"
+        - "Verify no regressions"
+      input: "verified_fix"
+      output: "verification_result"
+      
+    5:
+      name: "knowledge_update"
+      component: "MemoryStore"
+      actions:
+        - "Store successful fix"
+        - "Update knowledge base"
+        - "Learn pattern"
+      input: "verification_result"
+
+# ============================================
+# Self-Healing Configuration
+# ============================================
+self_healing:
+  enabled: true
+  auto_fix: true
+  max_retries: 3
+  
+  detection_sources:
+    - type: "log_file"
+      path: "/var/log/app.log"
+      patterns:
+        - "ERROR"
+        - "Exception"
+        - "Traceback"
+    - type: "test_failure"
+      command: "pytest"
+      pattern: "FAILED"
+    - type: "runtime_error"
+      patterns:
+        - "ZeroDivisionError"
+        - "TypeError"
+        - "ValueError"
+        - "AttributeError"
+        - "ImportError"
+
+  fix_strategies:
+    - name: "syntax_fix"
+      description: "Fix syntax errors"
+      priority: 1
+    - name: "import_fix"
+      description: "Fix import errors"
+      priority: 2
+    - name: "logic_fix"
+      description: "Fix logic errors"
+      priority: 3
+    - name: "type_fix"
+      description: "Fix type errors"
+      priority: 4
+
+  safety_checks:
+    - "Verify no breaking changes"
+    - "Check test coverage"
+    - "Validate code style"
+    - "Scan for security issues"
+
+  llm_config:
+    model: "gpt-4"
+    temperature: 0.2
+    max_tokens: 2000
+    system_prompt: |
+      You are an expert software engineer specializing in bug fixing.
+      Analyze the bug report and root cause, then generate a fix.
+
+# ============================================
+# Monitoring & Alerting
+# ============================================
+monitoring:
+  enabled: true
+  metrics:
+    - "bugs_detected"
+    - "bugs_fixed"
+    - "fix_success_rate"
+    - "time_to_fix"
+    - "false_positive_rate"
+  
+  alerting:
+    - channel: "log"
+      level: "info"
+    - channel: "webhook"
+      url: "${ALERT_WEBHOOK_URL}"
+      on_failure: true
+
+# ============================================
+# Deployment Configuration
+# ============================================
+deployment:
+  environment: "development"
+  
+  resources:
+    orchestrator:
+      cpu: "2"
+      memory: "4Gi"
+    bug_detector:
+      cpu: "1"
+      memory: "2Gi"
+    code_analyzer:
+      cpu: "2"
+      memory: "4Gi"
+    self_repair:
+      cpu: "2"
+      memory: "4Gi"
+    verification:
+      cpu: "2"
+      memory: "2Gi"
+
+  scaling:
+    auto_scaling: true
+    min_replicas: 1
+    max_replicas: 5
+    target_cpu_utilization: 70
+
+# ============================================
+# Security Configuration
+# ============================================
+security:
+  code_review_required: true
+  max_fix_size: 500  # lines
+  blocked_patterns:
+    - "eval("
+    - "exec("
+    - "os.system"
+    - "subprocess"
+  allowed_file_extensions:
+    - ".py"
+    - ".js"
+    - ".ts"
+    - ".go"
+    - ".java"

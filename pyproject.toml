@@ -1,0 +1,40 @@
+[project]
+name = "self-healing-agent"
+version = "1.0.0"
+description = "AI agent yang bisa mendeteksi dan memperbaiki bug secara otomatis"
+requires-python = ">=3.10"
+dependencies = [
+    "openhands>=0.24.0",
+    "pyyaml>=6.0",
+    "astor>=0.8.1",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "structlog>=23.1.0",
+    "rich>=13.5.0",
+    "tenacity>=8.2.0",
+    "chromadb>=0.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest-cov>=4.1.0",
+    "black>=23.7.0",
+    "ruff>=0.0.282",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
