@@ -13,6 +13,41 @@ Self-Healing Agent adalah sistem AI yang mampu:
 - **Apply Fixes** secara otomatis dengan safety checks
 - **Learn from Fixes** menyimpan knowledge untuk reuse
 
+## Dashboard (Web Interface)
+
+Aplikasi ini menyediakan dashboard web yang dapat dijalankan otomatis setiap 10 menit!
+
+### Menjalankan Dashboard
+
+```bash
+# Install dependencies
+pip install -e .
+
+# Jalankan server
+python server.py
+# atau
+python -m http.server 8080
+# lalu buka http://localhost:8080 di browser
+```
+
+### Fitur Dashboard
+
+- 📊 **Real-time Statistics** - Lihat statistik bugs detected/fixed
+- ⏰ **Auto-scheduler** - Berjalan otomatis setiap 10 menit
+- 📋 **Activity Logs** - Lihat log aktivitas workflow
+- ⚙️ **Configuration Viewer** - Lihat konfigurasi c4.yml
+- 🎮 **Controls** - Start/Stop scheduler manual
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/status` | GET | Get scheduler status |
+| `/api/config` | GET | Get c4.yml configuration |
+| `/api/start` | POST | Start scheduler |
+| `/api/stop` | POST | Stop scheduler |
+| `/api/run` | POST | Run workflow immediately |
+
 ## C4 Model Architecture
 
 Lihat `c4.yml` untuk arsitektur lengkap:
@@ -26,8 +61,8 @@ Lihat `c4.yml` untuk arsitektur lengkap:
 
 ```bash
 # Clone repository
-git clone <repo-url>
-cd self-healing-agent
+git clone https://github.com/antono4/Self-Healing-AI-Agent.git
+cd Self-Healing-AI-Agent
 
 # Install dependencies
 pip install -e .
@@ -63,6 +98,7 @@ self_healing:
   enabled: true
   auto_fix: true
   max_retries: 3
+  interval_minutes: 10  # Run every 10 minutes
   
 detection_sources:
   - type: "log_file"
