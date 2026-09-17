@@ -4,7 +4,6 @@ version = "1.0.0"
 description = "AI agent yang bisa mendeteksi dan memperbaiki bug secara otomatis"
 requires-python = ">=3.10"
 dependencies = [
-    "openhands>=0.24.0",
     "pyyaml>=6.0",
     "astor>=0.8.1",
     "pytest>=7.4.0",
