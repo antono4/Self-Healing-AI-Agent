@@ -3,7 +3,8 @@ name: Config Parser
 on:
   # Run every 10 minutes
   schedule:
-    - cron: '*/10 * * * *'
+    # setiap 10 menit
+    - cron: '2-59/10 * * * *'
   
   # Allow manual trigger
   workflow_dispatch:
